@@ -58,15 +58,6 @@
     <p id="status"></p>
   </div>
 
-  <!-- Metadata -->
-  <div class="section">
-    <h3>Set Metadata</h3>
-    <input id="mintAddress" placeholder="Mint Address" />
-    <input id="metadataUri" placeholder="Metadata JSON URI" />
-    <button id="metadataBtn">Set Metadata</button>
-    <p id="metadataStatus"></p>
-  </div>
-
   <!-- Metadata Generator -->
   <div class="section">
     <h3>Buat Metadata JSON</h3>
@@ -78,30 +69,29 @@
     <pre id="jsonOutput"></pre>
   </div>
 
-  <!-- JS Library -->
+  <!-- Solana libs -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.91.4/lib/index.iife.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.11/lib/index.iife.min.js"></script>
 
   <script>
-    const { Connection, PublicKey, clusterApiUrl, Transaction, SystemProgram, Keypair } = solanaWeb3;
-    const { createInitializeMintInstruction, getMinimumBalanceForRentExemptMint, MINT_SIZE, TOKEN_PROGRAM_ID } = splToken;
+    const connectBtn = document.getElementById("connectBtn");
+    const walletInfo = document.getElementById("walletInfo");
 
-    const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
-    let connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
+    // global vars
     let provider = null;
     let publicKey = null;
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
 
-    // Connect Phantom
-    document.getElementById("connectBtn").onclick = async () => {
+    // ✅ Connect Phantom
+    connectBtn.onclick = async () => {
       try {
         if (window.solana && window.solana.isPhantom) {
           const resp = await window.solana.connect();
-          publicKey = resp.publicKey;
           provider = window.solana;
-          document.getElementById("walletInfo").innerText = "✅ Connected: " + publicKey.toString();
+          publicKey = resp.publicKey;
+          walletInfo.innerText = "✅ Connected: " + publicKey.toString();
         } else {
-          alert("Phantom tidak ditemukan. Buka web ini di Phantom browser atau install extension Phantom.");
+          alert("Phantom tidak ditemukan. Buka web ini di browser Phantom App atau install extension Phantom.");
         }
       } catch (err) {
         console.error(err);
@@ -109,96 +99,52 @@
       }
     };
 
-    // Create Token
+    // ✅ Create Token
     document.getElementById("createBtn").onclick = async () => {
       if (!provider || !publicKey) return alert("Connect Phantom dulu!");
-      const name = document.getElementById("tokenName").value.trim();
-      const symbol = document.getElementById("tokenSymbol").value.trim();
-      const decimals = Number(document.getElementById("tokenDecimals").value);
-      const supply = BigInt(document.getElementById("tokenSupply").value);
 
-      if (!name || !symbol || !supply) return alert("Lengkapi semua data token!");
+      const decimals = Number(document.getElementById("tokenDecimals").value);
+      const supply = BigInt(document.getElementById("tokenSupply").value || "0");
 
       try {
         document.getElementById("status").innerText = "⏳ Membuat token...";
 
-        const mint = Keypair.generate();
-        const lamports = await getMinimumBalanceForRentExemptMint(connection);
+        const mint = solanaWeb3.Keypair.generate();
+        const lamports = await splToken.getMinimumBalanceForRentExemptMint(connection);
 
-        const tx = new Transaction().add(
-          SystemProgram.createAccount({
+        let tx = new solanaWeb3.Transaction().add(
+          solanaWeb3.SystemProgram.createAccount({
             fromPubkey: publicKey,
             newAccountPubkey: mint.publicKey,
-            space: MINT_SIZE,
+            space: splToken.MINT_SIZE,
             lamports,
-            programId: TOKEN_PROGRAM_ID,
+            programId: splToken.TOKEN_PROGRAM_ID,
           }),
-          createInitializeMintInstruction(mint.publicKey, decimals, publicKey, null)
+          splToken.createInitializeMintInstruction(
+            mint.publicKey,
+            decimals,
+            publicKey,
+            null
+          )
         );
 
         tx.feePayer = publicKey;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
         tx.partialSign(mint);
-        const signedTx = await provider.signTransaction(tx);
-        const sig = await connection.sendRawTransaction(signedTx.serialize());
+
+        const signed = await provider.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
         await connection.confirmTransaction(sig, "confirmed");
 
-        document.getElementById("status").innerText = `✅ Token dibuat!\nMint Address: ${mint.publicKey.toString()}`;
+        document.getElementById("status").innerText =
+          `✅ Token dibuat!\nMint Address: ${mint.publicKey.toString()}\nTx: ${sig}`;
       } catch (err) {
         console.error(err);
         document.getElementById("status").innerText = "❌ Error: " + err.message;
       }
     };
 
-    // Metadata PDA helper
-    async function getMetadataPDA(mint) {
-      return (
-        await PublicKey.findProgramAddress(
-          [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-          TOKEN_METADATA_PROGRAM_ID
-        )
-      )[0];
-    }
-
-    // Set Metadata
-    document.getElementById("metadataBtn").onclick = async () => {
-      if (!provider || !publicKey) return alert("Connect Phantom dulu!");
-      const mintAddress = document.getElementById("mintAddress").value.trim();
-      const uri = document.getElementById("metadataUri").value.trim();
-      if (!mintAddress || !uri) return alert("Isi Mint Address & Metadata URI!");
-
-      try {
-        document.getElementById("metadataStatus").innerText = "⏳ Setting metadata...";
-        const mintPubkey = new PublicKey(mintAddress);
-        const metadataPDA = await getMetadataPDA(mintPubkey);
-
-        const tx = new Transaction().add({
-          keys: [
-            { pubkey: metadataPDA, isSigner: false, isWritable: true },
-            { pubkey: mintPubkey, isSigner: false, isWritable: false },
-            { pubkey: publicKey, isSigner: true, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          ],
-          programId: TOKEN_METADATA_PROGRAM_ID,
-          data: Buffer.from(JSON.stringify({ name: "MyToken", symbol: "MTK", uri: uri }))
-        });
-
-        tx.feePayer = publicKey;
-        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-        const signedTx = await provider.signTransaction(tx);
-        const sig = await connection.sendRawTransaction(signedTx.serialize());
-        await connection.confirmTransaction(sig, "confirmed");
-
-        document.getElementById("metadataStatus").innerText = "✅ Metadata berhasil di-set!";
-      } catch (err) {
-        console.error(err);
-        document.getElementById("metadataStatus").innerText = "❌ Error: " + err.message;
-      }
-    };
-
-    // Generate Metadata JSON
+    // ✅ Generate Metadata JSON
     document.getElementById("genMetaBtn").onclick = () => {
       const name = document.getElementById("metaName").value.trim();
       const symbol = document.getElementById("metaSymbol").value.trim();
@@ -216,7 +162,7 @@
         image: logo,
         attributes: [
           { trait_type: "Project", value: "Custom Token" },
-          { trait_type: "Network", value: "Solana Mainnet" }
+          { trait_type: "Network", value: "Solana Devnet" }
         ],
         properties: {
           category: "token",
@@ -225,7 +171,7 @@
       };
 
       document.getElementById("jsonOutput").innerText = JSON.stringify(metadata, null, 2);
-      alert("✅ Metadata JSON berhasil dibuat.\nCopy JSON ini lalu upload ke NFT.Storage / Pinata.");
+      alert("✅ Metadata JSON berhasil dibuat. Upload ke NFT.Storage / Pinata untuk dapatkan URI.");
     };
   </script>
 </body>
