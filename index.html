@@ -11,9 +11,7 @@
       background: #f8f9fa;
       color: #222;
     }
-    h2, h3 {
-      text-align: center;
-    }
+    h2, h3 { text-align: center; }
     input, button {
       width: 100%;
       padding: 12px;
@@ -29,12 +27,8 @@
       border: none;
       cursor: pointer;
     }
-    button:hover {
-      background: #45a049;
-    }
-    p, pre {
-      word-wrap: break-word;
-    }
+    button:hover { background: #45a049; }
+    p, pre { word-wrap: break-word; }
     .section {
       background: white;
       padding: 16px;
@@ -85,8 +79,8 @@
   </div>
 
   <!-- JS Library -->
-  <script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.js"></script>
-  <script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.91.4/lib/index.iife.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.11/lib/index.iife.min.js"></script>
 
   <script>
     const { Connection, PublicKey, clusterApiUrl, Transaction, SystemProgram, Keypair } = solanaWeb3;
@@ -107,7 +101,7 @@
           provider = window.solana;
           document.getElementById("walletInfo").innerText = "✅ Connected: " + publicKey.toString();
         } else {
-          alert("Phantom tidak ditemukan. Buka web ini di browser Phantom App.");
+          alert("Phantom tidak ditemukan. Buka web ini di Phantom browser atau install extension Phantom.");
         }
       } catch (err) {
         console.error(err);
