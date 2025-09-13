@@ -60,15 +60,20 @@
 
     // Connect Phantom
     document.getElementById("connectBtn").onclick = async () => {
-      if (!window.solana) {
-        alert("Phantom Wallet tidak ditemukan. Install dulu dari https://phantom.app");
-        return;
-      }
+  try {
+    if (window.solana && window.solana.isPhantom) {
       const resp = await window.solana.connect();
       publicKey = resp.publicKey;
       provider = window.solana;
       document.getElementById("walletInfo").innerText = "Connected: " + publicKey.toString();
-    };
+    } else {
+      alert("Phantom Wallet tidak ditemukan. Install dulu dari https://phantom.app atau buka website di browser Phantom App (HP).");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Gagal connect Phantom: " + err.message);
+  }
+};
 
     // Create Token
     document.getElementById("createBtn").onclick = async () => {
