@@ -20,21 +20,22 @@
 <body>
   <h2>🚀 Solana Token Creator</h2>
 
+  <!-- Connect -->
   <div class="section">
     <button id="connectBtn">Connect Phantom</button>
     <p id="walletInfo"></p>
   </div>
 
+  <!-- Create Token -->
   <div class="section">
     <h3>Buat Token Baru</h3>
-    <input id="tokenName" placeholder="Token Name" />
-    <input id="tokenSymbol" placeholder="Token Symbol" />
     <input id="tokenDecimals" type="number" value="9" />
     <input id="tokenSupply" type="number" placeholder="Total Supply" />
     <button id="createBtn">Create Token</button>
     <p id="status"></p>
   </div>
 
+  <!-- Metadata -->
   <div class="section">
     <h3>Buat Metadata JSON</h3>
     <input id="metaName" placeholder="Token Name" />
@@ -45,27 +46,20 @@
     <pre id="jsonOutput"></pre>
   </div>
 
-  <!-- Solana libs -->
+  <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.91.4/lib/index.iife.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.11/lib/index.iife.min.js"></script>
 
   <script>
     const connectBtn = document.getElementById("connectBtn");
     const walletInfo = document.getElementById("walletInfo");
-
     let provider = null;
     let publicKey = null;
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
+    const connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl("devnet"), "confirmed"
+    );
 
-    // Ambil fungsi dari SPL Token
-    const {
-      TOKEN_PROGRAM_ID,
-      MINT_SIZE,
-      getMinimumBalanceForRentExemptMint,
-      createInitializeMintInstruction
-    } = window.splToken;
-
-    // ✅ Connect Phantom
+    // ✅ Connect Phantom (selalu jalan meski splToken error)
     connectBtn.onclick = async () => {
       try {
         if (window.solana && window.solana.isPhantom) {
@@ -85,6 +79,13 @@
     // ✅ Create Token
     document.getElementById("createBtn").onclick = async () => {
       if (!provider || !publicKey) return alert("Connect Phantom dulu!");
+
+      // pastikan splToken ada
+      if (!window.splToken) {
+        return alert("Library spl-token tidak terbaca dari CDN");
+      }
+
+      const { TOKEN_PROGRAM_ID, MINT_SIZE, getMinimumBalanceForRentExemptMint, createInitializeMintInstruction } = window.splToken;
 
       const decimals = Number(document.getElementById("tokenDecimals").value);
       const supply = BigInt(document.getElementById("tokenSupply").value || "0");
@@ -127,7 +128,7 @@
       }
     };
 
-    // ✅ Generate Metadata JSON
+    // ✅ Generate Metadata
     document.getElementById("genMetaBtn").onclick = () => {
       const name = document.getElementById("metaName").value.trim();
       const symbol = document.getElementById("metaSymbol").value.trim();
@@ -139,10 +140,7 @@
       }
 
       const metadata = {
-        name: name,
-        symbol: symbol,
-        description: desc,
-        image: logo,
+        name, symbol, description: desc, image: logo,
         attributes: [
           { trait_type: "Project", value: "Custom Token" },
           { trait_type: "Network", value: "Solana Devnet" }
@@ -154,7 +152,6 @@
       };
 
       document.getElementById("jsonOutput").innerText = JSON.stringify(metadata, null, 2);
-      alert("✅ Metadata JSON berhasil dibuat. Upload ke NFT.Storage / Pinata untuk dapatkan URI.");
     };
   </script>
 </body>
