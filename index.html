@@ -1,18 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Solana Token Generator - Create your own token on Solana Mainnet"
-    />
-    <title>Solana Token Generator</title>
-  </head>
-  <body>
-    <noscript>Enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SPL Token Creator + Metadata</title>
+  <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+  <script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
+  <script src="https://unpkg.com/@metaplex-foundation/mpl-token-metadata@2.10.2/dist/index.umd.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
+    .container { max-width: 650px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h1, h2 { font-size: 20px; margin-bottom: 10px; }
+    input { width: 100%; padding: 8px; margin: 6px 0; border: 1px solid #ccc; border-radius: 6px; }
+    button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+    .btn-primary { background: #6d28d9; color: white; }
+    .btn-success { background: #16a34a; color: white; }
+    .result { margin-top: 20px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+    img { max-width: 120px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 SPL Token Creator + Metadata (Phantom)</h1>
+
+    <button id="connectBtn" class="btn-primary">Connect Phantom</button>
+    <p id="walletInfo"></p>
+
+    <hr/>
+
+    <h2>1️⃣ Create Token</h2>
+    <input type="text" id="tokenName" placeholder="Token Name" />
+    <input type="text" id="tokenSymbol" placeholder="Symbol" />
+    <input type="number" id="tokenDecimals" placeholder="Decimals (e.g. 9)" value="9"/>
+    <input type="number" id="tokenSupply" placeholder="Total Supply" value="1000000"/>
+    <button id="createBtn" class="btn-success">Create Token</button>
+
+    <div id="result" class="result" style="display:none;"></div>
+
+    <hr/>
+
+    <h2>2️⃣ Add Metadata</h2>
+    <input type="text" id="mintAddress" placeholder="Mint Address (Token)" />
+    <input type="text" id="metaName" placeholder="Name" />
+    <input type="text" id="metaSymbol" placeholder="Symbol" />
+    <input type="url" id="metaUri" placeholder="Metadata.json URL (IPFS/Arweave)" />
+    <button id="metaBtn" class="btn-success">Add Metadata</button>
+
+    <div id="metaResult" class="result" style="display:none;"></div>
+  </div>
+
+  <script>
+    const { Connection, clusterApiUrl, Keypair, Transaction, SystemProgram, PublicKey } = solanaWeb3;
+    const splToken = spl_token;
+    const mpl = mpl_token_metadata;
+    const connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
+
+    let provider = null;
+    let publicKey = null;
+
+    // Connect Phantom
+    document.getElementById("connectBtn").onclick = async () => {
+      if (!window.solana) {
+        alert("Phantom Wallet tidak ditemukan. Install dulu dari https://phantom.app");
+        return;
+      }
+      const resp = await window.solana.connect();
+      publicKey = resp.publicKey;
+      provider = window.solana;
+      document.getElementById("walletInfo").innerText = "Connected: " + publicKey.toString();
+    };
+
+    // Create Token
+    document.getElementById("createBtn").onclick = async () => {
+      if (!provider || !publicKey) return alert("Connect Phantom dulu!");
+      const name = document.getElementById("tokenName").value.trim();
+      const symbol = document.getElementById("tokenSymbol").value.trim();
+      const decimals = Number(document.getElementById("tokenDecimals").value);
+      const supply = BigInt(document.getElementById("tokenSupply").value);
+
+      try {
+        const mint = Keypair.generate();
+        const lamports = await splToken.getMinimumBalanceForRentExemptMint(connection);
+
+        const tx = new Transaction().add(
+          SystemProgram.createAccount({
+            fromPubkey: publicKey,
+            newAccountPubkey: mint.publicKey,
+            space: splToken.MINT_SIZE,
+            lamports,
+            programId: splToken.TOKEN_PROGRAM_ID,
+          }),
+          splToken.createInitializeMintInstruction(
+            mint.publicKey,
+            decimals,
+            publicKey,
+            null
+          )
+        );
+
+        const ata = await splToken.getAssociatedTokenAddress(mint.publicKey, publicKey);
+        tx.add(
+          splToken.createAssociatedTokenAccountInstruction(
+            publicKey,
+            ata,
+            publicKey,
+            mint.publicKey
+          )
+        );
+
+        tx.add(
+          splToken.createMintToInstruction(
+            mint.publicKey,
+            ata,
+            publicKey,
+            supply * BigInt(10 ** decimals)
+          )
+        );
+
+        tx.feePayer = publicKey;
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        tx.partialSign(mint);
+
+        const signed = await provider.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+        await connection.confirmTransaction(sig, "confirmed");
+
+        const resultDiv = document.getElementById("result");
+        resultDiv.style.display = "block";
+        resultDiv.innerHTML = `
+          <h3>✅ Token Created!</h3>
+          <p><b>Mint Address:</b> ${mint.publicKey.toString()}</p>
+          <p><b>Tx:</b> <a href="https://solscan.io/tx/${sig}" target="_blank">${sig}</a></p>
+          <p><b>Name:</b> ${name}</p>
+          <p><b>Symbol:</b> ${symbol}</p>
+          <p><b>Decimals:</b> ${decimals}</p>
+          <p><b>Supply:</b> ${supply.toString()}</p>
+          <p style="color:red; font-size:12px;">⚠️ Simpan private key mint token agar tetap punya kontrol!</p>
+        `;
+      } catch (err) {
+        console.error(err);
+        alert("Error: " + err.message);
+      }
+    };
+
+    // Add Metadata
+    document.getElementById("metaBtn").onclick = async () => {
+      if (!provider || !publicKey) return alert("Connect Phantom dulu!");
+
+      const mintAddr = document.getElementById("mintAddress").value.trim();
+      const metaName = document.getElementById("metaName").value.trim();
+      const metaSymbol = document.getElementById("metaSymbol").value.trim();
+      const metaUri = document.getElementById("metaUri").value.trim();
+
+      try {
+        const mint = new PublicKey(mintAddr);
+
+        // PDA Metadata
+        const [metadataPDA] = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("metadata"),
+            mpl.PROGRAM_ID.toBuffer(),
+            mint.toBuffer(),
+          ],
+          mpl.PROGRAM_ID
+        );
+
+        const ix = mpl.createCreateMetadataAccountV3Instruction(
+          {
+            metadata: metadataPDA,
+            mint: mint,
+            mintAuthority: publicKey,
+            payer: publicKey,
+            updateAuthority: publicKey,
+          },
+          {
+            createMetadataAccountArgsV3: {
+              data: {
+                name: metaName,
+                symbol: metaSymbol,
+                uri: metaUri,
+                sellerFeeBasisPoints: 0,
+                creators: null,
+                collection: null,
+                uses: null,
+              },
+              isMutable: true,
+              collectionDetails: null,
+            },
+          }
+        );
+
+        const tx = new Transaction().add(ix);
+        tx.feePayer = publicKey;
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+        const signed = await provider.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+        await connection.confirmTransaction(sig, "confirmed");
+
+        const div = document.getElementById("metaResult");
+        div.style.display = "block";
+        div.innerHTML = `
+          <h3>✅ Metadata Ditambahkan!</h3>
+          <p><b>Mint Address:</b> ${mintAddr}</p>
+          <p><b>Tx:</b> <a href="https://solscan.io/tx/${sig}" target="_blank">${sig}</a></p>
+          <p><b>Metadata URL:</b> <a href="${metaUri}" target="_blank">${metaUri}</a></p>
+        `;
+      } catch (err) {
+        console.error(err);
+        alert("Error: " + err.message);
+      }
+    };
+  </script>
+</body>
 </html>
