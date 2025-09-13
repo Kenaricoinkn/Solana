@@ -5,49 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Solana Token Creator</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 16px;
-      background: #f8f9fa;
-      color: #222;
-    }
+    body { font-family: Arial, sans-serif; padding: 16px; background: #f8f9fa; }
     h2, h3 { text-align: center; }
     input, button {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
+      width: 100%; padding: 12px; margin: 8px 0; font-size: 16px;
+      border-radius: 8px; border: 1px solid #ccc;
     }
-    button {
-      background: #4CAF50;
-      color: white;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-    }
+    button { background: #4CAF50; color: white; font-weight: bold; border: none; cursor: pointer; }
     button:hover { background: #45a049; }
-    p, pre { word-wrap: break-word; }
-    .section {
-      background: white;
-      padding: 16px;
-      margin: 12px 0;
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
+    .section { background: white; padding: 16px; margin: 12px 0; border-radius: 12px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
   </style>
 </head>
 <body>
   <h2>🚀 Solana Token Creator</h2>
 
-  <!-- Connect -->
   <div class="section">
     <button id="connectBtn">Connect Phantom</button>
     <p id="walletInfo"></p>
   </div>
 
-  <!-- Create Token -->
   <div class="section">
     <h3>Buat Token Baru</h3>
     <input id="tokenName" placeholder="Token Name" />
@@ -58,7 +35,6 @@
     <p id="status"></p>
   </div>
 
-  <!-- Metadata Generator -->
   <div class="section">
     <h3>Buat Metadata JSON</h3>
     <input id="metaName" placeholder="Token Name" />
@@ -77,10 +53,17 @@
     const connectBtn = document.getElementById("connectBtn");
     const walletInfo = document.getElementById("walletInfo");
 
-    // global vars
     let provider = null;
     let publicKey = null;
     const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
+
+    // Ambil fungsi dari SPL Token
+    const {
+      TOKEN_PROGRAM_ID,
+      MINT_SIZE,
+      getMinimumBalanceForRentExemptMint,
+      createInitializeMintInstruction
+    } = window.splToken;
 
     // ✅ Connect Phantom
     connectBtn.onclick = async () => {
@@ -91,7 +74,7 @@
           publicKey = resp.publicKey;
           walletInfo.innerText = "✅ Connected: " + publicKey.toString();
         } else {
-          alert("Phantom tidak ditemukan. Buka web ini di browser Phantom App atau install extension Phantom.");
+          alert("Phantom tidak ditemukan.");
         }
       } catch (err) {
         console.error(err);
@@ -110,17 +93,17 @@
         document.getElementById("status").innerText = "⏳ Membuat token...";
 
         const mint = solanaWeb3.Keypair.generate();
-        const lamports = await splToken.getMinimumBalanceForRentExemptMint(connection);
+        const lamports = await getMinimumBalanceForRentExemptMint(connection);
 
         let tx = new solanaWeb3.Transaction().add(
           solanaWeb3.SystemProgram.createAccount({
             fromPubkey: publicKey,
             newAccountPubkey: mint.publicKey,
-            space: splToken.MINT_SIZE,
+            space: MINT_SIZE,
             lamports,
-            programId: splToken.TOKEN_PROGRAM_ID,
+            programId: TOKEN_PROGRAM_ID,
           }),
-          splToken.createInitializeMintInstruction(
+          createInitializeMintInstruction(
             mint.publicKey,
             decimals,
             publicKey,
