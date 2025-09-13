@@ -1,0 +1,19 @@
+{
+  "name": "MyToken",
+  "symbol": "MTK",
+  "description": "Token percobaan di Solana.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmExampleHashLogo",
+  "attributes": [
+    { "trait_type": "Project", "value": "Demo Token" },
+    { "trait_type": "Creator", "value": "Kamu" }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://gateway.pinata.cloud/ipfs/QmExampleHashLogo",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+  }
+}
