@@ -13,14 +13,10 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1"
   },
-  "devDependencies": {
-    "typescript": "4.9.5"
-  },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false react-scripts --openssl-legacy-provider build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "postinstall": "npm install --legacy-peer-deps || true"
+    "eject": "react-scripts eject"
   }
 }
